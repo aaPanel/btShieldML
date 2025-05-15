@@ -1,0 +1,22 @@
+data_paths:
+  models: data/models      # Used by SVM, Bayes
+  signatures: data/signatures # Used by Hash, YARA
+  config: data/config     # Used by Statistical, potentially SVM (for hashState.json)
+
+performance:
+  concurrency: 8
+
+output:
+  format: console # console, json, or html (Default if -output not used)
+
+# Enable analyzers for this stage
+enabled_analyzers:
+  - regex
+  - yara
+  - statistical # Now depends on AST
+  # - bayes_words # Needs models/Words.model
+  - svm_prosses # Needs models/svm_prosses.onnx
+
+# exclusions: # Optional: Add file/directory paths to exclude
+#   - vendor/
+#   - tests/

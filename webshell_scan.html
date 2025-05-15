@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>WebShell安全检测平台 - 专业安全分析工具</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0a4da8;
+            --primary-light: #2d6fcc;
+            --primary-dark: #08367a;
+            --secondary: #f8f9fa;
+            --border: #dee2e6;
+            --text: #212529;
+            --text-light: #6c757d;
+            --safe: #28a745;
+            --warning: #fd7e14;
+            --danger: #dc3545;
+            --unknown: #6c757d;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding-bottom: 40px;
+        }
+        
+        .header {
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        
+        .logo-icon {
+            margin-right: 10px;
+            font-size: 1.8rem;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-btn {
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            margin-left: 10px;
+        }
+        
+        .header-btn:hover {
+            background: #e9ecef;
+        }
+        
+        .header-btn i {
+            margin-right: 6px;
+        }
+        
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            padding: 30px;
+            margin-bottom: 30px;
+            transition: box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            color: var(--text-light);
+            font-size: 1rem;
+            margin-bottom: 25px;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border);
+            background: linear-gradient(145deg, rgba(240,242,245,0.8) 0%, rgba(247,250,252,0.8) 100%);
+            border-radius: 10px;
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(10, 77, 168, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        .upload-area.file-dropped {
+            animation: pulse 0.6s cubic-bezier(0.4, 0, 0.6, 1);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .upload-area input {
+            display: none;
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+            transition: transform 0.3s ease;
+        }
+        
+        .upload-area:hover .upload-icon {
+            transform: translateY(-5px);
+        }
+        
+        .upload-text {
+            font-size: 1.15rem;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        
+        .upload-subtext {
+            font-size: 0.95rem;
+            color: var(--text-light);
+            margin-top: 8px;
+        }
+        
+        .file-list {
+            margin-bottom: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fff;
+        }
+        
+        .file-item {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+        
+        .file-icon {
+            margin-right: 14px;
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            color: var(--text);
+            margin-right: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+        
+        .file-size {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+        
+        .file-remove {
+            color: var(--text-light);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .file-remove:hover {
+            color: var(--danger);
+            background: rgba(220, 53, 69, 0.1);
+        }
+        
+        .scan-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: 0.3px;
+        }
+        
+        .scan-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(10, 77, 168, 0.15);
+        }
+        
+        .scan-btn:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        
+        .scan-btn:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .scan-btn.scanning {
+            background: var(--primary);
+            pointer-events: none;
+            position: relative;
+            padding-left: 40px;
+        }
+        
+        .scan-btn.scanning:before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .scan-btn-icon {
+            margin-right: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 40px 0;
+        }
+        
+        .loading-spinner-container {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top: 3px solid var(--primary);
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-percentage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .loading-text {
+            font-size: 1.1rem;
+            color: var(--text);
+            margin-bottom: 5px;
+        }
+        
+        .loading-subtext {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .result-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .result-actions {
+            display: flex;
+        }
+        
+        .action-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 14px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+            color: var(--text);
+        }
+        
+        .action-btn:hover {
+            background: var(--secondary);
+            border-color: var(--text-light);
+        }
+        
+        .action-btn-icon {
+            margin-right: 8px;
+        }
+        
+        .result-summary {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-item {
+            flex: 1;
+            background: linear-gradient(145deg, rgb(250, 250, 250) 0%, rgb(255, 255, 255) 100%);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        
+        .summary-item:hover {
+            transform: translateY(-2px);
+        }
+        
+        .summary-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .summary-safe .summary-icon {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--safe);
+        }
+        
+        .summary-warning .summary-icon {
+            background: rgba(253, 126, 20, 0.1);
+            color: var(--warning);
+        }
+        
+        .summary-danger .summary-icon {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+        
+        .summary-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .summary-count {
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        
+        .summary-safe .summary-count {
+            color: var(--safe);
+        }
+        
+        .summary-warning .summary-count {
+            color: var(--warning);
+        }
+        
+        .summary-danger .summary-count {
+            color: var(--danger);
+        }
+        
+        .summary-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+        
+        .result-table-wrapper {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        
+        .result-table th {
+            background: var(--secondary);
+            text-align: left;
+            padding: 14px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-light);
+        }
+        
+        .result-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .result-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .result-table tr:hover {
+            background-color: rgba(0,0,0,0.01);
+        }
+        
+        .file-name {
+            display: flex;
+            align-items: center;
+        }
+        
+        .file-status-icon {
+            margin-right: 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+        
+        .risk-safe {
+            color: var(--safe);
+            font-weight: 500;
+        }
+        
+        .risk-safe .file-status-icon {
+            background: rgba(40, 167, 69, 0.1);
+        }
+        
+        .risk-warning {
+            color: var(--warning);
+            font-weight: 500;
+        }
+        
+        .risk-warning .file-status-icon {
+            background: rgba(253, 126, 20, 0.1);
+        }
+        
+        .risk-danger {
+            color: var(--danger);
+            font-weight: 500;
+        }
+        
+        .risk-danger .file-status-icon {
+            background: rgba(220, 53, 69, 0.1);
+        }
+        
+        .risk-unknown {
+            color: var(--unknown);
+        }
+        
+        .desc-cell {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .tag-safe {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--safe);
+        }
+        
+        .tag-warning {
+            background: rgba(253, 126, 20, 0.1);
+            color: var(--warning);
+        }
+        
+        .tag-danger {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger);
+        }
+        
+        .footer {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .footer a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 15px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .header-right {
+                margin-top: 10px;
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .container {
+                padding: 0 15px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .upload-area {
+                padding: 30px 15px;
+            }
+            
+            .result-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .result-actions {
+                margin-top: 15px;
+            }
+            
+            .result-summary {
+                flex-direction: column;
+            }
+            
+            .summary-item {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">
+                    <img 
+                        src="data:image/x-icon;base64,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" 
+                        alt="堡塔WebShell检测平台" 
+                        style="width: 45px; height: 45px; vertical-align: middle;">
+                </span>
+                <span>堡塔WebShell检测平台</span>
+            </div>
+            <div class="header-right">
+                <button class="header-btn">
+                    <i class="bi bi-question-circle"></i>
+                    <span>使用指南</span>
+                </button>
+                <button class="header-btn">
+                    <i class="bi bi-gear"></i>
+                    <span>高级设置</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+<div class="container">
+        <div class="card">
+            <h1>WebShell文件检测</h1>
+    <div class="subtitle">支持 php、jsp、jspx、asp 格式二进制文件，文件大小不超过 10M</div>
+            
+    <div class="upload-area" id="uploadArea">
+        <input type="file" id="fileInput" multiple accept=".php,.jsp,.jspx,.asp">
+                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                <div class="upload-text">点击选择文件 或 拖拽文件到区域内</div>
+                <div class="upload-subtext">支持批量上传，最多可同时上传20个文件</div>
+            </div>
+            
+            <div class="file-list" id="fileList" style="display:none;"></div>
+            
+            <button class="scan-btn" id="scanBtn" disabled>
+                <span class="scan-btn-icon"><i class="bi bi-shield-check"></i></span>
+                <span>点击检测</span>
+            </button>
+        </div>
+        
+        <div id="loading" class="loading" style="display:none;">
+            <div class="loading-spinner-container">
+                <div class="loading-spinner"></div>
+                <div class="loading-percentage">42%</div>
+            </div>
+            <div class="loading-text">正在分析文件特征...</div>
+            <div class="loading-subtext">已完成 <span id="processedCount">3</span>/<span id="totalCount">7</span> 个文件</div>
+        </div>
+        
+        <div id="resultArea"></div>
+    </div>
+    
+    <div class="footer">
+        <div>堡塔WebShell检测平台 © 2025 | <a href="#">API文档</a> | <a href="#">隐私政策</a></div>
+    </div>
+    
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const scanBtn = document.getElementById('scanBtn');
+    const resultArea = document.getElementById('resultArea');
+    const loading = document.getElementById('loading');
+        const processedCount = document.getElementById('processedCount');
+        const totalCount = document.getElementById('totalCount');
+    let files = [];
+
+    // 拖拽上传
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', e => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+            
+            // 添加落下动效
+            uploadArea.classList.add('file-dropped');
+            setTimeout(() => uploadArea.classList.remove('file-dropped'), 600);
+            
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+    function handleFiles(selectedFiles) {
+            // 清空原有文件列表，避免累加
+            files = [];
+            
+            // 过滤大小超过10MB的文件
+            const invalidFiles = Array.from(selectedFiles).filter(f => f.size > 10 * 1024 * 1024);
+            if (invalidFiles.length > 0) {
+                alert(`以下文件超过10MB限制，无法上传:\n${invalidFiles.map(f => f.name).join('\n')}`);
+            }
+            
+            // 添加有效文件
+            const validFiles = Array.from(selectedFiles).filter(f => f.size <= 10 * 1024 * 1024);
+            files = [...validFiles]; // 直接替换，不是追加
+            
+            // 限制文件数量为20个
+            if (files.length > 20) {
+                files = files.slice(0, 20);
+                alert('最多只能上传20个文件，超出部分已被忽略');
+            }
+            
+        renderFileList();
+        scanBtn.disabled = files.length === 0;
+        resultArea.innerHTML = '';
+    }
+
+    function renderFileList() {
+        if (files.length === 0) {
+                fileList.style.display = 'none';
+            return;
+            }
+            
+            fileList.style.display = 'block';
+            fileList.innerHTML = files.map((f, index) => {
+                const fileExt = f.name.split('.').pop().toLowerCase();
+                let fileIconClass = 'bi-file-earmark-text';
+                
+                // 根据文件类型设置不同图标
+                if (fileExt === 'php') fileIconClass = 'bi-filetype-php';
+                else if (fileExt === 'jsp' || fileExt === 'jspx') fileIconClass = 'bi-filetype-java';
+                else if (fileExt === 'asp') fileIconClass = 'bi-filetype-html';
+                
+                return `
+                <div class="file-item">
+                    <div class="file-info">
+                        <span class="file-icon"><i class="bi ${fileIconClass}"></i></span>
+                        <span class="file-name">${f.name}</span>
+                        <span class="file-size">(${formatFileSize(f.size)})</span>
+                    </div>
+                    <button class="file-remove" data-index="${index}" title="移除文件">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>`;
+            }).join('');
+            
+            // 为删除按钮添加事件
+            document.querySelectorAll('.file-remove').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    const index = parseInt(e.target.closest('.file-remove').dataset.index);
+                    files.splice(index, 1);
+                    renderFileList();
+                    scanBtn.disabled = files.length === 0;
+                });
+            });
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+            else return (bytes / 1048576).toFixed(1) + " MB";
+    }
+
+    scanBtn.addEventListener('click', async () => {
+        if (files.length === 0) return;
+            
+        scanBtn.disabled = true;
+            scanBtn.classList.add('scanning');
+            scanBtn.innerHTML = '<span>正在检测中...</span>';
+            loading.style.display = 'flex';
+        resultArea.innerHTML = '';
+            
+            // 更新进度信息
+            totalCount.textContent = files.length;
+            processedCount.textContent = '0';
+            
+        const formData = new FormData();
+        files.forEach(f => formData.append('file', f));
+            
+            try {
+                // 使用真实API
+                const resp = await fetch('/api/scan', { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                if (!resp.ok) {
+                    throw new Error(`服务器返回错误: ${resp.status}`);
+                }
+            const data = await resp.json();
+                
+                // 等待进度超过85%
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    if (progress >= 100) {
+                        clearInterval(progressInterval);
+                        return;
+                    }
+                    
+                    progress += Math.floor(Math.random() * 10) + 1;
+                    if (progress > 100) progress = 100;
+                    
+                    document.querySelector('.loading-percentage').textContent = progress + '%';
+                    
+                    // 随机更新处理文件数
+                    const processed = Math.min(Math.floor((progress / 100) * files.length), files.length);
+                    processedCount.textContent = processed;
+                    
+                    // 更新检测阶段文本
+                    if (progress < 30) {
+                        document.querySelector('.loading-text').textContent = '正在分析文件特征...';
+                    } else if (progress < 60) {
+                        document.querySelector('.loading-text').textContent = '应用机器学习模型检测...';
+                    } else if (progress < 90) {
+                        document.querySelector('.loading-text').textContent = '执行启发式规则检测...';
+                    } else {
+                        document.querySelector('.loading-text').textContent = '生成检测报告...';
+                    }
+                    
+                }, 200);
+                
+                // 等待进度超过85%
+                while (progress < 85) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                // 清除进度条更新
+                clearInterval(progressInterval);
+                
+                // 显示100%完成
+                document.querySelector('.loading-percentage').textContent = '100%';
+                processedCount.textContent = files.length;
+                document.querySelector('.loading-text').textContent = '检测完成！';
+                
+                // 短暂延迟后显示结果
+                setTimeout(() => {
+                    showResults(data.results);
+                    scanBtn.classList.remove('scanning');
+                    scanBtn.innerHTML = '<span class="scan-btn-icon"><i class="bi bi-shield-check"></i></span><span>点击检测</span>';
+                    scanBtn.disabled = false;
+        loading.style.display = 'none';
+                }, 500);
+                
+            } catch (e) {
+                resultArea.innerHTML = `
+                <div class="card">
+                    <div class="result-header">
+                        <div class="result-title">检测失败</div>
+                    </div>
+                    <div class="risk-danger" style="padding: 15px 0;">
+                        ${e.message}，请重试。检查网络连接或联系管理员。
+                    </div>
+                </div>`;
+                console.error(e);
+                
+                scanBtn.classList.remove('scanning');
+                scanBtn.innerHTML = '<span class="scan-btn-icon"><i class="bi bi-shield-check"></i></span><span>点击检测</span>';
+        scanBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+    });
+
+    function showResults(results) {
+        if (results.length === 0) {
+                resultArea.innerHTML = `
+                <div class="card">
+                    <div class="risk-unknown" style="text-align:center; padding: 15px 0;">
+                        未检测到任何结果，请重新上传文件。
+                    </div>
+                </div>`;
+            return;
+        }
+            results.sort((a, b) => {
+            const riskOrder = {
+                '木马文件': 1,
+                '疑似木马': 2,
+                '无风险': 3,
+                '未知': 4
+                };
+                
+                return riskOrder[a.risk] - riskOrder[b.risk];
+            }); 
+            // 计算检测统计信息
+            const total = results.length;
+            const safeCount = results.filter(r => r.risk === '无风险').length;
+            const warningCount = results.filter(r => r.risk === '疑似木马').length;
+            const dangerCount = results.filter(r => r.risk === '木马文件').length;
+            
+            let html = `
+            <div class="card">
+                <div class="result-header">
+                    <div class="result-title">检测结果</div>
+                    <div class="result-actions">
+                        <button class="action-btn" id="downloadBtn">
+                            <i class="bi bi-download"></i>
+                            <span>下载报告</span>
+                        </button>
+                        <button class="action-btn" id="clearBtn">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>重新检测</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="result-summary">
+                    <div class="summary-item summary-safe">
+                        <div class="summary-icon">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-count">${safeCount}</div>
+                            <div class="summary-label">安全文件</div>
+                        </div>
+                    </div>
+                    <div class="summary-item summary-warning">
+                        <div class="summary-icon">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-count">${warningCount}</div>
+                            <div class="summary-label">疑似木马</div>
+                        </div>
+                    </div>
+                    <div class="summary-item summary-danger">
+                        <div class="summary-icon">
+                            <i class="bi bi-x-circle"></i>
+                        </div>
+                        <div class="summary-content">
+                            <div class="summary-count">${dangerCount}</div>
+                            <div class="summary-label">木马文件</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="result-table-wrapper">
+                    <table class="result-table">
+                        <thead>
+                            <tr>
+                                <th width="30%">文件名</th>
+                                <th width="10%">类型</th>
+                                <th width="15%">风险等级</th>
+                                <th width="25%">说明</th>
+                                <th width="10%">MD5</th>
+                                <th width="10%">大小</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            
+        for (const r of results) {
+                // 根据风险类型选择风险类名和图标
+                let riskClass = 'risk-unknown';
+                let icon = '<i class="bi bi-question-circle"></i>';
+                let tagClass = '';
+                
+                if (r.risk === '无风险') {
+                    riskClass = 'risk-safe';
+                    icon = '<i class="bi bi-check-circle"></i>';
+                    tagClass = 'tag-safe';
+                } else if (r.risk === '木马文件') {
+                    riskClass = 'risk-danger';
+                    icon = '<i class="bi bi-x-circle"></i>';
+                    tagClass = 'tag-danger';
+                } else if (r.risk === '疑似木马') {
+                    riskClass = 'risk-warning';
+                    icon = '<i class="bi bi-exclamation-triangle"></i>';
+                    tagClass = 'tag-warning';
+                }
+                
+                html += `
+                <tr>
+                    <td>
+                        <div class="file-name">
+                            <span class="file-status-icon ${riskClass}">${icon}</span>
+                            <span>${r.filename}</span>
+                        </div>
+                    </td>
+                <td>${r.type || '-'}</td>
+                    <td><span class="tag ${tagClass}">${r.risk}</span></td>
+                    <td class="desc-cell" title="${r.description || ''}">${r.description || '-'}</td>
+                    <td style="font-size:0.85rem; font-family:monospace;">${r.md5 ? r.md5.substring(0, 8) + '...' : '-'}</td>
+                    <td>${formatFileSize(r.size || 0)}</td>
+            </tr>`;
+            }
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+            
+            resultArea.innerHTML = html;
+            
+            // 添加下载报告按钮事件
+            document.getElementById('downloadBtn').addEventListener('click', () => {
+                const reportData = {
+                    timestamp: new Date().toISOString(),
+                    summary: {
+                        total: total,
+                        safe: safeCount,
+                        warning: warningCount,
+                        danger: dangerCount
+                    },
+                    results: results
+                };
+                
+                const blob = new Blob([JSON.stringify(reportData, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `webshell_scan_report_${formatDate(new Date())}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+            // 添加重新检测按钮事件
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                files = [];
+                renderFileList();
+                scanBtn.disabled = true;
+                resultArea.innerHTML = '';
+            });
+        }
+        
+        // 格式化日期为 YYYYMMDD_HHMMSS 格式
+        function formatDate(date) {
+            return date.getFullYear() + 
+                   padZero(date.getMonth() + 1) + 
+                   padZero(date.getDate()) + '_' + 
+                   padZero(date.getHours()) + 
+                   padZero(date.getMinutes()) + 
+                   padZero(date.getSeconds());
+        }
+        
+        function padZero(num) {
+            return num.toString().padStart(2, '0');
+    }
+</script>
+</body>
+</html>
