@@ -1,10 +1,29 @@
-# 使用Debian作为基础镜像
+# 第一阶段：构建环境
+FROM golang:1.22-bullseye AS builder
+
+WORKDIR /build
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制源代码
+COPY . .
+
+# 安装Go依赖
+RUN go mod download
+
+# 只编译shieldml_server
+RUN go build -tags netgo,osusergo -ldflags '-s -w -extldflags "-static"' -o shieldml_server ./shieldml_server.go
+
+# 第二阶段：运行环境
 FROM debian:11-slim
 
-# 设置工作目录
 WORKDIR /www/dk_project/dk_app/shieldml/
 
-# 安装必要的依赖
+# 安装必要的运行时依赖
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     tzdata \
@@ -12,15 +31,17 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /www/dk_project/dk_app/shieldml/data
 
-# 设置时区为亚洲/上海
+# 设置时区
 ENV TZ=Asia/Shanghai
 
-# 复制必要文件到容器中
-COPY shieldml_server /www/dk_project/dk_app/shieldml/
-COPY bt-shieldml /www/dk_project/dk_app/shieldml/
-COPY shieldml_scan.html /www/dk_project/dk_app/shieldml/
+# 从构建阶段复制编译好的程序和HTML文件
+COPY --from=builder /build/shieldml_server /www/dk_project/dk_app/shieldml/
+COPY --from=builder /build/shieldml_scan.html /www/dk_project/dk_app/shieldml/
 
-# 确保文件有执行权限
+# 复制bt-shieldml（假设这是预先编译好的二进制文件）
+COPY bt-shieldml /www/dk_project/dk_app/shieldml/
+
+# 设置权限
 RUN chmod +x /www/dk_project/dk_app/shieldml/shieldml_server && \
     chmod +x /www/dk_project/dk_app/shieldml/bt-shieldml && \
     echo '{"results":[]}' > /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
