@@ -4,7 +4,7 @@ FROM golang:1.22-bullseye AS builder
 WORKDIR /build
 
 # 安装系统依赖
-RUN apt-get update && apt-get install -y \
+RUN apt update && apt install -y \
     build-essential \
     automake \
     libtool \
@@ -49,7 +49,7 @@ FROM debian:11-slim
 WORKDIR /www/dk_project/dk_app/shieldml/
 
 # 安装必要的运行时依赖
-RUN apt-get update && apt-get install -y \
+RUN apt update && apt install -y \
     ca-certificates \
     tzdata \
     wget \
