@@ -2,7 +2,7 @@
  * @Author: wpl
  * @Date: 2025-04-15 09:44:28
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2025-05-14 16:44:23
+ * @LastEditTime: 2025-05-15 18:06:42
  * @Description: 通用类型定义
  */
 package types

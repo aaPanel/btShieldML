@@ -1,4 +1,13 @@
 #!/bin/bash
+# 设置目标架构（由环境变量传入，默认为amd64）
+ARCH=${GOARCH:-amd64}
+
+# 根据架构设置编译参数
+if [ "$ARCH" = "arm64" ]; then
+  export GOARCH=arm64
+else
+  export GOARCH=amd64
+fi
 
 # 设置工作目录为项目根目录
 cd "$(dirname "$0")"
@@ -24,5 +33,9 @@ export CGO_CFLAGS="-O2 -g"
 
 # 完全静态构建
 go build -tags yara_static,netgo,osusergo -ldflags '-s -w -extldflags "-static"' -o bt-shieldml ./cmd/
-
 echo "静态构建完成: bt-shieldml"
+
+# 编译web服务平台
+go build -tags netgo,osusergo -ldflags '-s -w -extldflags "-static"' -o shieldml_server ./shieldml_server.go
+
+echo "静态构建完成: shieldml_server"

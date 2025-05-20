@@ -113,12 +113,11 @@ bash build.sh
 ## web检测平台编译
 > 默认是6528端口，可支持修改
 
-编译并运行
+前面的build.sh已经编译过了，这里直接运行
 ```
-go build -o webshell_server webshell_server.go
-./webshell_server
+./shieldml_server
 ```
-访问 http://服务器ip:6528/webshell_scan.html 即可
+访问 http://服务器ip:6528/shieldml_scan.html 即可
 <p align="center">
     <img width="1986" alt="image" src="https://github.com/aaPanel/btShieldML/blob/main/img/webserver.png?raw=true">
 </p>
