@@ -31,4 +31,4 @@ jobs:
           push: true
           no-cache: true
           tags: |
-            btpanel/btshieldmL:latest
+            btpanel/btshieldml:latest
