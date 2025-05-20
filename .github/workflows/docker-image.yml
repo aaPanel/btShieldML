@@ -34,7 +34,6 @@ jobs:
           file: ./dockerfile
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
           tags: |
             btpanel/btshieldml:latest
