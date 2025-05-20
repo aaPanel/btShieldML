@@ -46,9 +46,41 @@ var scanLock sync.Mutex
 // 上次扫描时间
 var lastScanTime time.Time
 
+// 添加安全相关HTTP头
+func securityMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 防止目录列表
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		// 防止点击劫持
+		w.Header().Set("X-Frame-Options", "DENY")
+		// XSS保护
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		// 内容安全策略
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data:;")
+		// 不缓存敏感页面
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
+	// API路由
 	http.HandleFunc("/api/scan", scanHandler)
-	http.Handle("/", http.FileServer(http.Dir(".")))
+
+	// 静态文件处理
+	fileHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 只允许访问shieldml_scan.html
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			http.Redirect(w, r, "/shieldml_scan.html", http.StatusFound)
+		} else if r.URL.Path == "/shieldml_scan.html" {
+			http.ServeFile(w, r, "shieldml_scan.html")
+		} else {
+			http.Error(w, "拒绝访问", http.StatusForbidden)
+		}
+	})
+
+	// 应用安全中间件
+	http.Handle("/", securityMiddleware(fileHandler))
 
 	fmt.Println("服务已启动：http://localhost:6528/shieldml_scan.html")
 	http.ListenAndServe(":6528", nil)

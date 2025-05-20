@@ -10,7 +10,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制源代码
-COPY . .
+COPY --from=builder /build/shieldml_server /www/dk_project/dk_app/shieldml/
+COPY --from=builder /build/shieldml_scan.html /www/dk_project/dk_app/shieldml/
+COPY bt-shieldml /www/dk_project/dk_app/shieldml/
 
 # 安装Go依赖
 RUN go mod download
@@ -45,8 +47,8 @@ COPY bt-shieldml /www/dk_project/dk_app/shieldml/
 RUN chmod +x /www/dk_project/dk_app/shieldml/shieldml_server && \
     chmod +x /www/dk_project/dk_app/shieldml/bt-shieldml && \
     echo '{"results":[]}' > /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
-    chmod 777 /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
-    chmod 777 /www/dk_project/dk_app/shieldml/data
+    chmod 755 /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
+    chmod 755 /www/dk_project/dk_app/shieldml/data
 
 # 暴露端口
 EXPOSE 6528
@@ -54,6 +56,10 @@ EXPOSE 6528
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost:6528/shieldml_scan.html || exit 1
+
+# 创建非特权用户
+RUN groupadd -r shieldml && useradd -r -g shieldml shieldml
+USER shieldml
 
 # 启动服务
 CMD ["/www/dk_project/dk_app/shieldml/shieldml_server"]
