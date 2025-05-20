@@ -69,14 +69,21 @@ func main() {
 
 	// 静态文件处理
 	fileHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 只允许访问shieldml_scan.html
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-			http.Redirect(w, r, "/shieldml_scan.html", http.StatusFound)
-		} else if r.URL.Path == "/shieldml_scan.html" {
-			http.ServeFile(w, r, "shieldml_scan.html")
-		} else {
-			http.Error(w, "拒绝访问", http.StatusForbidden)
+		// 允许访问API路径
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			// API 请求会在单独的处理器中处理，这里不做操作
+			http.NotFound(w, r)
+			return
 		}
+
+		// 允许访问 shieldml_scan.html
+		if r.URL.Path == "/shieldml_scan.html" {
+			http.ServeFile(w, r, "shieldml_scan.html")
+			return
+		}
+
+		// 所有其他路径都重定向到 shieldml_scan.html
+		http.Redirect(w, r, "/shieldml_scan.html", http.StatusFound)
 	})
 
 	// 应用安全中间件

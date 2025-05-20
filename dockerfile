@@ -10,13 +10,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制源代码
-COPY . .
+# 只需要三个文件 shieldml_scan.html 和 shieldml_server.go 和 bt-shieldml
+COPY shieldml_scan.html .
+COPY shieldml_server.go .
+COPY bt-shieldml .
+COPY go.mod .
 
 # 安装Go依赖
-RUN go mod download
+# RUN go mod download
 
 # 只编译shieldml_server
-RUN go build -tags netgo,osusergo -ldflags '-s -w -extldflags "-static"' -o shieldml_server ./shieldml_server.go
+RUN go mod tidy && \
+    go build -tags netgo,osusergo -ldflags '-s -w -extldflags "-static"' -o shieldml_server ./shieldml_server.go
 
 # 第二阶段：运行环境
 FROM debian:11-slim
