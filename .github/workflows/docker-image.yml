@@ -37,3 +37,6 @@ jobs:
           no-cache: true
           tags: |
             btpanel/btshieldml:latest
+      - name: Clean up Docker node cache
+        run: |
+          curl -X POST "https://docker.1ms.run/sapi/v1/cache_cleanup/manifests" -F="repo=docker.io"  -F "reference=latest"  -F "name=btpanel/btshieldml"
