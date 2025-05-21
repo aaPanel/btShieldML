@@ -45,12 +45,16 @@ COPY --from=builder /build/shieldml_scan.html /www/dk_project/dk_app/shieldml/
 COPY --from=builder /build/shieldml_scan.js /www/dk_project/dk_app/shieldml/
 COPY --from=builder /build/bt-shieldml /www/dk_project/dk_app/shieldml/
 
+# 创建非特权用户
+RUN groupadd -r shieldml && useradd -r -g shieldml shieldml
+
 # 设置权限
 RUN chmod +x /www/dk_project/dk_app/shieldml/shieldml_server && \
     chmod +x /www/dk_project/dk_app/shieldml/bt-shieldml && \
     echo '{"results":[]}' > /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
     chmod 755 /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
-    chmod 755 /www/dk_project/dk_app/shieldml/data
+    chmod 755 /www/dk_project/dk_app/shieldml/data && \
+    chown -R shieldml:shieldml /www/dk_project/dk_app/shieldml
 
 # 暴露端口
 EXPOSE 6528
@@ -59,8 +63,6 @@ EXPOSE 6528
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost:6528/shieldml_scan.html || exit 1
 
-# 创建非特权用户
-RUN groupadd -r shieldml && useradd -r -g shieldml shieldml
 USER shieldml
 
 # 启动服务
