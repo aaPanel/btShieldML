@@ -81,7 +81,6 @@ func main() {
 			http.ServeFile(w, r, "shieldml_scan.html")
 			return
 		}
-		fmt.Println("重定向到 shieldml_scan.html")
 
 		// 所有其他路径都重定向到 shieldml_scan.html
 		http.Redirect(w, r, "/shieldml_scan.html", http.StatusFound)
