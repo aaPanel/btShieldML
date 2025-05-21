@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制源代码
-# 只需要三个文件 shieldml_scan.html 和 shieldml_server.go 和 bt-shieldml
 COPY shieldml_scan.html .
+COPY shieldml_scan.js .
 COPY shieldml_server.go .
 COPY bt-shieldml .
 COPY go.mod .
@@ -39,10 +39,11 @@ RUN apt-get update && apt-get install -y \
 # 设置时区
 ENV TZ=Asia/Shanghai
 
-# 从构建阶段复制编译好的程序和HTML文件
+# 从构建阶段复制编译好的程序和HTML/JS文件
 COPY --from=builder /build/shieldml_server /www/dk_project/dk_app/shieldml/
 COPY --from=builder /build/shieldml_scan.html /www/dk_project/dk_app/shieldml/
-COPY bt-shieldml /www/dk_project/dk_app/shieldml/
+COPY --from=builder /build/shieldml_scan.js /www/dk_project/dk_app/shieldml/
+COPY --from=builder /build/bt-shieldml /www/dk_project/dk_app/shieldml/
 
 # 设置权限
 RUN chmod +x /www/dk_project/dk_app/shieldml/shieldml_server && \

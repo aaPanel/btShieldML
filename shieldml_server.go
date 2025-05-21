@@ -78,7 +78,15 @@ func main() {
 
 		// 允许访问 shieldml_scan.html
 		if r.URL.Path == "/shieldml_scan.html" {
+			w.Header().Set("Content-Type", "text/html")
 			http.ServeFile(w, r, "shieldml_scan.html")
+			return
+		}
+
+		// 允许访问 shieldml_scan.js
+		if r.URL.Path == "/shieldml_scan.js" {
+			w.Header().Set("Content-Type", "application/javascript")
+			http.ServeFile(w, r, "shieldml_scan.js")
 			return
 		}
 
