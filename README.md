@@ -39,10 +39,24 @@
 </p>
 
 ##  安装指南
-### 第一种方法：直接下载编译好的二进制文件
+### 第一种方法：docker容器搭建
+方案1：可以在终端拉取镜像，然后直接访问http://ip:6528/shieldml_scan.html
+```
+docker run -d \
+  --name btshieldml \
+  -p 6528:6528 \
+  btpanel/btshieldml:latest
+```
+
+方案2：到面板的docker应用商店下载，搜索"btshieldml",点击安装即可
+
+流程：Docker->应用商店->搜索"btshieldml"->点击安装即可
 
 
-### 第二种方法：编译源码
+### 第二种方法：直接下载编译好的二进制文件
+
+
+### 第三种方法：编译源码
 > 编译环境：Go 1.22 + Linux系统
 
 第一步：安装依赖环境
@@ -83,6 +97,8 @@ make -C php-bridge
 ```
 bash build.sh
 ```
+
+
 
 
 ## 使用方法
