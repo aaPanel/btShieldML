@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"os/exec"
@@ -19,14 +22,15 @@ import (
 )
 
 type ScanResult struct {
-	Filename string `json:"filename"`
-	Size     int64  `json:"size"`
-	MD5      string `json:"md5"`
-	SHA256   string `json:"sha256"`
-	Type     string `json:"type"`
-	Risk     string `json:"risk"`
-	Icon     string `json:"icon"`
-	Desc     string `json:"desc"`
+	Filename  string `json:"filename"`
+	Size      int64  `json:"size"`
+	MD5       string `json:"md5"`
+	SHA256    string `json:"sha256"`
+	Type      string `json:"type"`
+	Risk      string `json:"risk"`      // 风险说明（如“疑似木马”）
+	RiskScore int    `json:"riskScore"` // 风险分数（如1、2、3、4、5、0）
+	Icon      string `json:"icon"`
+	Desc      string `json:"desc"`
 }
 
 // JSON文件结构体
@@ -66,6 +70,8 @@ func securityMiddleware(next http.Handler) http.Handler {
 func main() {
 	// API路由
 	http.HandleFunc("/api/scan", scanHandler)
+	http.HandleFunc("/api/report", reportFalsePositiveHandler)
+	http.HandleFunc("/api/detail", fileDetailHandler)
 
 	// 静态文件处理
 	fileHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +117,30 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 	scanLock.Lock()
 	defer scanLock.Unlock()
 
+	// 清空临时目录
+	tmpDir := "data/tmp"
+	if _, err := os.Stat(tmpDir); os.IsNotExist(err) {
+		// 目录不存在，创建目录
+		err = os.MkdirAll(tmpDir, 0755)
+		if err != nil {
+			fmt.Printf("创建临时目录失败: %v\n", err)
+			http.Error(w, "创建临时目录失败", 500)
+			return
+		}
+	} else {
+		// 目录存在，清空目录
+		files, err := ioutil.ReadDir(tmpDir)
+		if err != nil {
+			fmt.Printf("读取临时目录失败: %v\n", err)
+			http.Error(w, "读取临时目录失败", 500)
+			return
+		}
+		for _, f := range files {
+			os.Remove(filepath.Join(tmpDir, f.Name()))
+		}
+	}
+
+	// 解析上传的文件
 	err := r.ParseMultipartForm(20 << 20) // 20MB
 	if err != nil {
 		http.Error(w, "文件解析失败", 400)
@@ -129,7 +159,7 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// 保存所有文件到临时文件夹
+	// 保存所有文件到临时文件夹和临时目录
 	var filePaths []string
 	fileInfos := make(map[string]struct {
 		size   int64
@@ -139,6 +169,10 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	for _, fh := range files {
+		if !strings.HasSuffix(strings.ToLower(fh.Filename), ".php") {
+			continue // 只处理php文件
+		}
+
 		file, err := fh.Open()
 		if err != nil {
 			continue
@@ -151,19 +185,42 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		size, _ := io.Copy(out, file)
+
+		// 读取文件内容
+		fileContent, err := ioutil.ReadAll(file)
+		if err != nil {
+			out.Close()
+			continue
+		}
+
+		// 计算MD5
+		md5Hash := md5.Sum(fileContent)
+		md5Str := hex.EncodeToString(md5Hash[:])
+
+		// 将文件内容写入临时文件
+		out.Write(fileContent)
 		out.Close()
 
-		filePaths = append(filePaths, tmpPath)
-		md5Str, sha256Str := calcHash(tmpPath)
+		// 将文件保存到data/tmp目录，命名为md5.扩展名
+		ext := filepath.Ext(fh.Filename)
+		tmpFilePath := filepath.Join(tmpDir, md5Str+ext)
+		err = ioutil.WriteFile(tmpFilePath, fileContent, 0644)
+		if err != nil {
+			fmt.Printf("保存临时文件失败: %v\n", err)
+		}
 
+		// 重新打开文件以计算SHA256
+		file.Seek(0, 0)
+		sha256Str, _ := calcSHA256(file)
+
+		filePaths = append(filePaths, tmpPath)
 		fileInfos[fh.Filename] = struct {
 			size   int64
 			md5    string
 			sha256 string
 			ftype  string
 		}{
-			size:   size,
+			size:   int64(len(fileContent)),
 			md5:    md5Str,
 			sha256: sha256Str,
 			ftype:  getFileType(fh.Filename),
@@ -175,7 +232,7 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 调用bt-shieldml检测整个目录
+	// 设置命令的输出重定向
 	cmd := exec.Command("./bt-shieldml", "-path", tempDir, "-format", "json")
 	err = cmd.Run()
 	if err != nil {
@@ -224,6 +281,7 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 		var icon string = "unknown"
 		var risk string = "未知"
 		var desc string = res.Description
+		var riskScore int = res.Risk
 
 		if res.Risk >= 4 {
 			icon = "danger"
@@ -237,14 +295,15 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		results = append(results, ScanResult{
-			Filename: originalName,
-			Size:     fileInfo.size,
-			MD5:      fileInfo.md5,
-			SHA256:   fileInfo.sha256,
-			Type:     fileInfo.ftype,
-			Risk:     risk,
-			Icon:     icon,
-			Desc:     desc,
+			Filename:  originalName,
+			Size:      fileInfo.size,
+			MD5:       fileInfo.md5,
+			SHA256:    fileInfo.sha256,
+			Type:      fileInfo.ftype,
+			Risk:      risk,
+			RiskScore: riskScore,
+			Icon:      icon,
+			Desc:      desc,
 		})
 	}
 
@@ -320,5 +379,391 @@ func getFileType(name string) string {
 			return ext[1:] // 安全地移除前导点
 		}
 		return "unknown"
+	}
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+// 误报上报处理函数
+func reportFalsePositiveHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "仅支持POST", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 解析多部分表单，以获取文件
+	err := r.ParseMultipartForm(20 << 20) // 20MB
+	if err != nil {
+		http.Error(w, "文件解析失败", 400)
+		return
+	}
+
+	// 获取文件
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		fmt.Printf("获取文件失败: %v\n", err)
+		http.Error(w, "获取文件失败", 400)
+		return
+	}
+	defer file.Close()
+
+	// 获取文件信息
+	filename := header.Filename
+	fileType := r.FormValue("type")
+	if fileType == "" {
+		fileType = getFileType(filename)
+	}
+
+	// 获取风险分数
+	riskLevel := r.FormValue("type")
+	if riskLevel == "" {
+		riskLevel = "0" // 默认风险等级
+	}
+
+	md5Hash := r.FormValue("md5")
+
+	// 保存文件到临时目录
+	tempFile, err := ioutil.TempFile("", "report-*."+fileType)
+	if err != nil {
+		fmt.Printf("创建临时文件失败: %v\n", err)
+		http.Error(w, "创建临时文件失败", 500)
+		return
+	}
+	defer os.Remove(tempFile.Name())
+
+	// 复制文件内容
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		fmt.Printf("复制文件内容失败: %v\n", err)
+		http.Error(w, "复制文件内容失败", 500)
+		return
+	}
+	tempFile.Close()
+
+	// 如果没有提供MD5，计算文件的MD5
+	if md5Hash == "" {
+		md5Hash, _ = calcHash(tempFile.Name())
+	}
+
+	// 获取access_key
+	accessKey, _ := getUserAccessKey()
+
+	// 获取token
+	tokenInfo, err := getReportToken(tempFile.Name(), accessKey)
+	if err != nil {
+		fmt.Printf("获取上报token失败: %v\n", err)
+		http.Error(w, "获取上报token失败", 500)
+		return
+	}
+
+	// 从响应中提取token
+	var token string
+	if resMap, ok := tokenInfo.Res.(map[string]interface{}); ok {
+		if tokenStr, ok := resMap["token"].(string); ok {
+			token = tokenStr
+		}
+	}
+
+	if token == "" {
+		fmt.Println("无法从响应中提取token")
+		http.Error(w, "获取token失败", 500)
+		return
+	}
+
+	// 构建上报参数
+	params := map[string]string{
+		"auto":       "1",
+		"token":      token,
+		"access_key": accessKey,
+	}
+
+	// 根据风险分数设置class和type
+	riskInt := 0
+	fmt.Sscanf(riskLevel, "%d", &riskInt)
+
+	if riskInt == 0 {
+		params["class"] = "0" // 白样本
+		params["type"] = "0"  // 0风险
+	} else if riskInt >= 4 {
+		params["class"] = "1"                       // 黑样本
+		params["type"] = fmt.Sprintf("%d", riskInt) // 使用原始风险等级
+	} else {
+		params["class"] = "1"                       // 疑似木马也作为黑样本
+		params["type"] = fmt.Sprintf("%d", riskInt) // 使用原始风险等级
+	}
+
+	// 上传文件 - 直接使用原始文件
+	err = uploadFalsePositive(tempFile.Name(), filename, fileType, md5Hash, params)
+	if err != nil {
+		fmt.Printf("上报误报失败: %v\n", err)
+		http.Error(w, "上报误报失败", 500)
+		return
+	}
+
+	// 返回成功
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "误报上报成功",
+	})
+}
+
+// TokenResponse 结构体
+type TokenResponse struct {
+	Success bool        `json:"success"`
+	Res     interface{} `json:"res"`
+	Nonce   int64       `json:"nonce"`
+}
+
+// 获取上报token
+func getReportToken(filePath, accessKey string) (*TokenResponse, error) {
+	// 构建请求URL
+	apiUrl := "https://www.bt.cn/api/v2/error/information"
+
+	// 创建一个缓冲区来存储请求体
+	var requestBody bytes.Buffer
+	writer := multipart.NewWriter(&requestBody)
+
+	// 添加文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("打开文件失败: %v", err)
+	}
+	defer file.Close()
+
+	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+	if err != nil {
+		return nil, fmt.Errorf("创建表单文件失败: %v", err)
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil, fmt.Errorf("复制文件内容失败: %v", err)
+	}
+
+	// 添加其他表单字段
+	writer.WriteField("access_key", accessKey)
+	writer.WriteField("auto", "1")
+	writer.WriteField("class", "2")
+	writer.WriteField("type", "0")
+
+	// 关闭writer以完成请求体
+	err = writer.Close()
+	if err != nil {
+		return nil, fmt.Errorf("关闭writer失败: %v", err)
+	}
+
+	// 创建请求
+	req, err := http.NewRequest("POST", apiUrl, &requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	// 设置Content-Type
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// 发送请求
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	fmt.Println("响应:", string(body))
+
+	// 解析响应
+	var tokenResp TokenResponse
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %v", err)
+	}
+
+	if !tokenResp.Success {
+		errMsg, ok := tokenResp.Res.(string)
+		if ok {
+			return nil, fmt.Errorf("获取token失败: %s", errMsg)
+		}
+		return nil, fmt.Errorf("获取token失败")
+	}
+
+	return &tokenResp, nil
+}
+
+// 获取用户access_key
+func getUserAccessKey() (string, error) {
+	// 读取用户信息文件
+	userInfoPath := "/www/server/panel/data/userInfo.json"
+
+	// 如果在开发环境，可以使用相对路径
+	if !fileExists(userInfoPath) {
+		userInfoPath = "userInfo.json" // 尝试当前目录
+	}
+
+	if !fileExists(userInfoPath) {
+		return "", fmt.Errorf("用户信息文件不存在")
+	}
+
+	content, err := ioutil.ReadFile(userInfoPath)
+	if err != nil {
+		return "", err
+	}
+
+	var userInfo struct {
+		AccessKey string `json:"access_key"`
+	}
+
+	if err := json.Unmarshal(content, &userInfo); err != nil {
+		return "", err
+	}
+
+	if userInfo.AccessKey == "" {
+		return "", fmt.Errorf("access_key为空")
+	}
+
+	return userInfo.AccessKey, nil
+}
+
+// 上传误报文件
+func uploadFalsePositive(filePath, filename, fileType, md5Hash string, params map[string]string) error {
+	// 构建请求URL
+	apiUrl := "https://www.bt.cn/api/v2/error/information"
+
+	// 创建一个缓冲区来存储请求体
+	var requestBody bytes.Buffer
+	writer := multipart.NewWriter(&requestBody)
+
+	// 添加文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("打开文件失败: %v", err)
+	}
+	defer file.Close()
+
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return fmt.Errorf("创建表单文件失败: %v", err)
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return fmt.Errorf("复制文件内容失败: %v", err)
+	}
+
+	// 添加其他表单字段 - 确保包含所有必要字段
+	writer.WriteField("access_key", params["access_key"])
+	writer.WriteField("token", params["token"])
+	writer.WriteField("type", params["type"])   // 风险级别
+	writer.WriteField("class", params["class"]) // 样本类型
+	writer.WriteField("auto", params["auto"])   // 上报类型
+
+	// 关闭writer以完成请求体
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("关闭writer失败: %v", err)
+	}
+
+	// 创建请求
+	req, err := http.NewRequest("POST", apiUrl, &requestBody)
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	// 设置Content-Type
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// 发送请求
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("读取响应失败: %v", err)
+	}
+
+	fmt.Println("上报响应:", string(body))
+
+	// 检查响应
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("上报失败，状态码: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// 计算SHA256
+func calcSHA256(reader io.Reader) (string, error) {
+	h := sha256.New()
+	if _, err := io.Copy(h, reader); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// 文件详情处理函数
+func fileDetailHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "仅支持GET", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 获取文件MD5和类型
+	md5Hash := r.URL.Query().Get("md5")
+	fileType := r.URL.Query().Get("type")
+	mode := r.URL.Query().Get("mode")
+
+	if md5Hash == "" || fileType == "" {
+		http.Error(w, "参数不完整", 400)
+		return
+	}
+
+	// 构建文件路径
+	filePath := filepath.Join("data/tmp", md5Hash+"."+fileType)
+
+	// 检查文件是否存在
+	if !fileExists(filePath) {
+		http.Error(w, "文件不存在", 404)
+		return
+	}
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		http.Error(w, "读取文件失败", 500)
+		return
+	}
+
+	// 返回文件内容（使用base64编码确保二进制安全）
+	w.Header().Set("Content-Type", "application/json")
+	if mode == "base64" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  true,
+			"content":  base64.StdEncoding.EncodeToString(content),
+			"md5":      md5Hash,
+			"type":     fileType,
+			"isBase64": true,
+		})
+	} else {
+		// 默认文本模式
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  true,
+			"content":  string(content),
+			"md5":      md5Hash,
+			"type":     fileType,
+			"isBase64": false,
+		})
 	}
 }

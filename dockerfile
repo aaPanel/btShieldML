@@ -34,7 +34,8 @@ RUN apt-get update && apt-get install -y \
     tzdata \
     wget \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /www/dk_project/dk_app/shieldml/data
+    && mkdir -p /www/dk_project/dk_app/shieldml/data \
+    && mkdir -p /www/dk_project/dk_app/shieldml/data/tmp
 
 # 设置时区
 ENV TZ=Asia/Shanghai
@@ -54,6 +55,7 @@ RUN chmod +x /www/dk_project/dk_app/shieldml/shieldml_server && \
     echo '{"results":[]}' > /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
     chmod 755 /www/dk_project/dk_app/shieldml/data/webshellJson.json && \
     chmod 755 /www/dk_project/dk_app/shieldml/data && \
+    chmod 755 /www/dk_project/dk_app/shieldml/data/tmp && \
     chown -R shieldml:shieldml /www/dk_project/dk_app/shieldml
 
 # 暴露端口

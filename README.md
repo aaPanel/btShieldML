@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://www.bt.cn/static/new/images/logo.svg" alt="btShieldML " width="300"/>
+<img src="https://www.bt.cn/static/new/images/logo_03.svg" alt="btShieldML " width="300"/>
 </div>
 
 <h1 align="center">堡塔木马查杀引擎</h1>
